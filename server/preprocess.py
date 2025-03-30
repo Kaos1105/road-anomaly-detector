@@ -6,13 +6,16 @@ import cv2
 from io import BytesIO
 from scipy.interpolate import interp1d
 from flask import send_file, jsonify
+import matplotlib.pyplot as plt
+from PIL import Image
+from io import BytesIO
 
 global_min_gyro = 0
 global_min_accel = 0
 global_max_gyro = 30
 global_max_accel = 80
 
-def preprocess_csv(file, target_fs=50, duration=2.0, gap_threshold=30):
+def preprocess_csv(file, target_fs=50, duration=2.0):
     # Load CSV (Assume columns: timestamp, gyro_mag, accel_mag)
     df = pd.read_csv(file)
 
@@ -77,23 +80,44 @@ def generate_spectrogram(signal, fs=50, WR=5, duration=2, overlap_percent=50):
 
     return f, t, Sxx
 
-
 def generate_spectrogram_image(Sxx):
-    """Generate spectrogram using OpenCV and return as in-memory image."""
-    Sxx = (Sxx - Sxx.min()) / (Sxx.max() - Sxx.min())  # Normalize to [0,1]
-    Sxx = (Sxx * 255).astype(np.uint8)  # Convert to uint8 grayscale image
+    """Generate spectrogram image using OpenCV and return as in-memory JPG.
+    
+    Args:
+        Sxx: Spectrogram data (2D numpy array)
+        file_name: Base name for the image (without extension)
+        
+    Returns:
+        BytesIO: In-memory JPG image buffer
+    """
+    # Ensure input is numpy array and float
+    Sxx = np.asarray(Sxx, dtype=np.float32)
+    # Flip Sxx vertically to match Matplotlib orientation (low freq at bottom)
+    Sxx = np.flipud(Sxx)
+    
+    # Normalize to [0,1]
+    if Sxx.max() == Sxx.min():
+        Sxx_normalized = np.zeros_like(Sxx)
+    else:
+        Sxx_normalized = (Sxx - Sxx.min()) / (Sxx.max() - Sxx.min())
+    # Convert to uint8 (0-255 range)
+    Sxx_uint8 = (Sxx_normalized * 255).astype(np.uint8)
 
-    # Apply colormap (Jet for a more visually appealing spectrogram)
-    spectrogram_img = cv2.applyColorMap(Sxx, cv2.COLORMAP_JET)
-
+    # Apply JET colormap for visualization
+    spectrogram_img = cv2.applyColorMap(Sxx_uint8, cv2.COLORMAP_JET)
     # Resize to 224x224 for MobileNet compatibility
-    spectrogram_img = cv2.resize(spectrogram_img, (224, 224), interpolation=cv2.INTER_CUBIC)
-
-    # Encode as PNG in memory
-    _, buffer = cv2.imencode('.jpg', spectrogram_img)
-    img_io = BytesIO(buffer)
-
-    return img_io
+    spectrogram_img = cv2.resize(spectrogram_img, (224, 224), 
+                                interpolation=cv2.INTER_LANCZOS4)
+    # Encode as JPG in memory
+    success, buffer = cv2.imencode('.jpg', spectrogram_img, 
+                                 [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+    if not success:
+        raise ValueError("Failed to encode spectrogram image")
+    
+    jpg_buffer = BytesIO(buffer)
+    jpg_buffer.seek(0)
+    
+    return jpg_buffer
 
 def preprocess_api(request):
     if 'file' not in request.files:
@@ -111,11 +135,7 @@ def spectrogram_img(request):
         return {"error": "No file uploaded"}, 400
     
     file = request.files['file']
-    df = np.loadtxt(file, delimiter=',')  # Assuming a CSV with a single column of signal data
-
-    if df.ndim != 1:
-        return {"error": "Invalid file format, expected single-column CSV"}, 400
-
-    f, t, Sxx = generate_spectrogram(df)
+    new_time, new_gyro, new_accel = preprocess_csv(file)
+    f, t, Sxx = generate_spectrogram(new_accel)
     img_io = generate_spectrogram_image(Sxx)
     return send_file(img_io, mimetype='image/jpg')
