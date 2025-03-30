@@ -94,7 +94,7 @@ def generate_spectrogram_image(Sxx):
     Sxx = np.asarray(Sxx, dtype=np.float32)
     # Flip Sxx vertically to match Matplotlib orientation (low freq at bottom)
     Sxx = np.flipud(Sxx)
-    
+
     # Normalize to [0,1]
     if Sxx.max() == Sxx.min():
         Sxx_normalized = np.zeros_like(Sxx)
@@ -104,7 +104,7 @@ def generate_spectrogram_image(Sxx):
     Sxx_uint8 = (Sxx_normalized * 255).astype(np.uint8)
 
     # Apply JET colormap for visualization
-    spectrogram_img = cv2.applyColorMap(Sxx_uint8, cv2.COLORMAP_JET)
+    spectrogram_img = cv2.applyColorMap(Sxx_uint8, cv2.COLORMAP_VIRIDIS)
     # Resize to 224x224 for MobileNet compatibility
     spectrogram_img = cv2.resize(spectrogram_img, (224, 224), 
                                 interpolation=cv2.INTER_LANCZOS4)
