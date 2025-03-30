@@ -12,8 +12,8 @@ from io import BytesIO
 
 global_min_gyro = 0
 global_min_accel = 0
-global_max_gyro = 30
-global_max_accel = 80
+global_max_gyro = 20
+global_max_accel = 100
 
 def preprocess_csv(file, target_fs=50, duration=2.0):
     # Load CSV (Assume columns: timestamp, gyro_mag, accel_mag)
