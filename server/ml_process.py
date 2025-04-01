@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import xgboost as xgb
 from scipy.stats import skew, kurtosis
 from scipy.signal import find_peaks
 from scipy.fftpack import fft

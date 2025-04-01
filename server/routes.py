@@ -1,5 +1,5 @@
 from flask import jsonify, request
-from .preprocess import preprocess_api, spectrogram_img
+# from .preprocess import preprocess_api, spectrogram_img
 from .ml_process import predict
 
 def setup_routes(app):
